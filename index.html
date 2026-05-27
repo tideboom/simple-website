@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>儿童居家训练打卡</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:微软雅黑;}
+        body{background:#f0f8ff;padding:15px;max-width:480px;margin:0 auto;}
+        .title{text-align:center;font-size:24px;color:#2c5280;margin:15px 0;font-weight:bold;}
+        .star-area{text-align:center;font-size:28px;color:#FFD700;margin:12px 0;}
+        .star-num{font-size:22px;color:#333;margin-left:8px;}
+        .week-box{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;justify-content:center;}
+        .week-btn{padding:8px 12px;border:none;border-radius:8px;background:#4299e1;color:white;font-size:14px;}
+        .week-btn.active{background:#2b6cb0;}
+        .action-card{background:white;border-radius:12px;padding:20px;margin:15px 0;box-shadow:0 2px 8px #ddd;}
+        .action-name{font-size:18px;color:#333;margin-bottom:10px;text-align:center;line-height:1.5;}
+        .time-show{font-size:60px;text-align:center;color:#e53e3f;font-weight:bold;margin:20px 0;}
+        .tip-text{text-align:center;color:#666;font-size:14px;margin:8px 0;}
+        .btn-group{display:flex;justify-content:center;gap:10px;margin:25px 0;flex-wrap:wrap;}
+        .control-btn{padding:10px 16px;border:none;border-radius:8px;font-size:15px;}
+        .start{background:#48bb77;color:white;}
+        .resetCurrent{background:#9c27b0;color:white;}
+        .reset{background:#ed8936;color:white;}
+        .rest-tip{color:#9c27b0;font-size:16px;text-align:center;height:25px;}
+        .score-pop{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:none;justify-content:center;align-items:center;z-index:99;}
+        .score-box{background:#fff;padding:30px 20px;border-radius:15px;width:85%;text-align:center;}
+        .big-star{font-size:40px;color:#FFD700;margin:20px 0;}
+        .close-btn{margin-top:20px;padding:10px 30px;background:#4299e1;color:#fff;border-radius:8px;font-size:16px;}
+    </style>
+</head>
+<body>
+    <h1 class="title">儿童居家训练打卡</h1>
+    <div class="star-area">
+        <span id="starIcon">⭐</span>
+        <span class="star-num" id="starNum">0</span>
+    </div>
+
+    <div class="week-box">
+        <button class="week-btn active" onclick="changeWeek(1)">第一周</button>
+        <button class="week-btn" onclick="changeWeek(2)">第二周</button>
+        <button class="week-btn" onclick="changeWeek(3)">第三周</button>
+        <button class="week-btn" onclick="changeWeek(4)">第四周</button>
+    </div>
+
+    <div class="action-card">
+        <div class="actionName" id="actionName">原地慢踏步</div>
+        <div class="rest-tip" id="restTip">准备开始</div>
+        <div class="time-show" id="timeNum">30</div>
+        <p class="tip-text" id="actionTip">脚步放缓，手臂自然摆动</p>
+    </div>
+
+    <div class="btn-group">
+        <button class="control-btn start" id="startBtn" onclick="toggleStartPause()">开始训练</button>
+        <button class="control-btn resetCurrent" onclick="resetCurrentAction()">当前动作重置</button>
+        <button class="control-btn reset" onclick="resetTrain()">全部重置</button>
+    </div>
+
+    <div class="score-pop" id="scorePop">
+        <div class="score-box">
+            <h2>🎉 训练完成 🎉</h2>
+            <div class="big-star">⭐⭐⭐⭐⭐</div>
+            <p style="font-size:18px;">恭喜获得 5 颗星星！</p>
+            <button class="close-btn" onclick="closeScore()">太棒了！</button>
+        </div>
+    </div>
+
+<script>
+let totalStar = 0;
+let starIcon = document.getElementById("starIcon");
+let starNum = document.getElementById("starNum");
+
+function loadStars() {
+    const savedStars = localStorage.getItem('kidWorkoutStars');
+    if (savedStars) totalStar = parseInt(savedStars);
+    else totalStar = 0;
+    updateStarUI();
+}
+
+function saveStars() {
+    localStorage.setItem('kidWorkoutStars', totalStar.toString());
+}
+
+function speak(text) {
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    let voice = new SpeechSynthesisUtterance(text);
+    voice.lang = "zh-CN";
+    voice.rate = 0.9;
+    voice.pitch = 1;
+    speechSynthesis.speak(voice);
+}
+
+const weekAction = {
+    1:[
+        {name:"原地慢踏步",tip:"脚步放缓，手臂自然摆动"},
+        {name:"无离地摆臂开合",tip:"双脚不离地，动作轻柔舒展"},
+        {name:"左右侧向移步",tip:"小范围挪动，身体保持平稳"},
+        {name:"扶桌借力高抬腿",tip:"手扶桌椅借力，减轻身体负担"},
+        {name:"小幅轻袋鼠跳",tip:"轻轻蹦跳，落地轻柔不伤膝"},
+        {name:"浅度静态深蹲",tip:"膝盖不超脚尖，腰背挺直"}
+    ],
+    2:[
+        {name:"原地小快跑",tip:"匀速跑动，不用刻意加速"},
+        {name:"简易轻开合跳",tip:"小幅度跳跃，脚掌轻落地"},
+        {name:"左右横跳",tip:"控制跨度，稳住身体重心"},
+        {name:"无借力原地高抬腿",tip:"腰背立直，抬腿高度适中"},
+        {name:"轻柔兔子蹦跳",tip:"动作轻盈，避免大力蹬地"},
+        {name:"简易弓步踏步",tip:"步伐适中，双腿交替发力"},
+        {name:"抬手踮脚站立",tip:"缓慢踮脚，拉伸腿部肌肉"}
+    ],
+    3:[
+        {name:"原地小快跑",tip:"节奏均匀，配合自然摆臂"},
+        {name:"简易开合跳",tip:"规范动作，轻落地保护关节"},
+        {name:"左右横跳",tip:"稳步跳跃，把控身体平衡"},
+        {name:"原地高抬腿",tip:"均匀发力，运动全程不憋气"},
+        {name:"兔子蹦跳",tip:"趣味运动，力度适中即可"},
+        {name:"弓步踏步",tip:"交替踏步，锻炼下肢力量"},
+        {name:"抬手踮脚跳",tip:"手脚协同，动作协调流畅"},
+        {name:"标准静态深蹲",tip:"端正体态，不弯腰驼背"}
+    ],
+    4:[
+        {name:"变速原地踏步",tip:"快慢交替，调动全身状态"},
+        {name:"力度开合轻跳",tip:"动作舒展，依旧轻柔落地"},
+        {name:"侧向交叉步",tip:"锻炼身体协调性，灵活迈步"},
+        {name:"标准幅度高抬腿",tip:"稳定节奏，稳步提升耐力"},
+        {name:"趣味兔子蹦跳",tip:"保持运动兴致，认真完成动作"},
+        {name:"交替弓步踏动",tip:"加大动作幅度，强化腿部锻炼"},
+        {name:"向上抬手踮跳",tip:"充分拉伸，助力骨骼生长"},
+        {name:"深度静态深蹲",tip:"保持标准姿势，强化下肢力量"}
+    ]
+};
+
+const encourageWords = [
+    "坚持住哦，你做得很棒！",
+    "调整呼吸，马上就要完成啦",
+    "动作很标准，继续加油",
+    "小小身体能量满满，太厉害啦",
+    "稳住节奏，不要偷懒哦",
+    "坚持运动，个子快快长高"
+];
+
+let nowWeek = 1;
+let nowIndex = 0;
+let timer = null;
+let isRunning = false;
+let isPaused = false;
+let timeType = "sport";
+let encourageTimer = null;
+let second = 30;
+let startBtn = document.getElementById("startBtn");
+
+function updateStarUI() {
+    starIcon.innerText = "⭐";
+    starNum.innerText = totalStar;
+}
+
+function changeWeek(w){
+    nowWeek = w;
+    nowIndex = 0;
+    timeType = "sport";
+    resetTrain();
+    document.querySelectorAll(".week-btn").forEach(el=>el.className = "week-btn");
+    event.target.className = "week-btn active";
+    refreshAction();
+}
+
+function refreshAction(){
+    let list = weekAction[nowWeek];
+    let curr = list[nowIndex];
+    let total = list.length;
+    let currentNum = nowIndex + 1;
+    document.getElementById("actionName").innerText = `第${currentNum}个 / 共${total}个：${curr.name}`;
+    document.getElementById("actionTip").innerText = curr.tip;
+
+    if(timeType==="sport"){
+        second = 30;
+        document.getElementById("timeNum").innerText = second;
+        document.getElementById("restTip").innerText = "训练时段";
+    }else{
+        second = 20;
+        document.getElementById("timeNum").innerText = second;
+        document.getElementById("restTip").innerText = "休息调整呼吸";
+    }
+}
+
+function randomEncourage(){
+    if(isPaused) return;
+    let ran = Math.floor(Math.random()*encourageWords.length);
+    speak(encourageWords[ran]);
+}
+
+async function countDown5Seconds() {
+    speak("准备");
+    await new Promise(r => setTimeout(r, 800));
+    speak("3");
+    await new Promise(r => setTimeout(r, 1200));
+    speak("2");
+    await new Promise(r => setTimeout(r, 1200));
+    speak("1");
+    await new Promise(r => setTimeout(r, 1200));
+    speak("开始！");
+    await new Promise(r => setTimeout(r, 800));
+}
+
+function runTimer() {
+    if (!isRunning || isPaused) return;
+    clearInterval(timer);
+
+    if (timeType === "sport") {
+        encourageTimer = setTimeout(()=>{
+            if(!isPaused) randomEncourage();
+        }, 15000);
+    }
+
+    timer = setInterval(() => {
+        if (isPaused || !isRunning) return;
+        second--;
+        document.getElementById("timeNum").innerText = second;
+
+        if (second === 3) speak("还有三秒钟");
+        if (second <= 0) {
+            clearInterval(timer);
+            clearTimeout(encourageTimer);
+
+            if (timeType === "sport") {
+                speak("动作结束，开始休息");
+                timeType = "rest";
+                refreshAction();
+                runTimer();
+            } else {
+                timeType = "sport";
+                nowIndex++;
+                if (nowIndex >= weekAction[nowWeek].length) {
+                    finishAll();
+                    return;
+                }
+                refreshAction();
+                countDown5Seconds().then(() => runTimer());
+            }
+        }
+    }, 1000);
+}
+
+async function toggleStartPause() {
+    if (!isRunning && !isPaused) {
+        isRunning = true;
+        isPaused = false;
+        startBtn.innerText = "暂停训练";
+        await countDown5Seconds();
+        runTimer();
+    } else {
+        isPaused = !isPaused;
+        startBtn.innerText = isPaused ? "继续训练" : "暂停训练";
+
+        if (isPaused) {
+            clearInterval(timer);
+            clearTimeout(encourageTimer);
+            if ('speechSynthesis' in window) speechSynthesis.cancel();
+        } else {
+            await countDown5Seconds();
+            runTimer();
+        }
+    }
+}
+
+function finishAll() {
+    isRunning = false;
+    isPaused = false;
+    totalStar += 5;
+    saveStars();
+    updateStarUI();
+    speak("恭喜你，全部动作顺利完成！奖励5颗星星");
+    document.getElementById("scorePop").style.display = "flex";
+    resetTrain();
+}
+
+function resetCurrentAction() {
+    clearInterval(timer);
+    clearTimeout(encourageTimer);
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    isRunning = false;
+    isPaused = false;
+    startBtn.innerText = "开始训练";
+    refreshAction();
+}
+
+function resetTrain() {
+    clearInterval(timer);
+    clearTimeout(encourageTimer);
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    isRunning = false;
+    isPaused = false;
+    nowIndex = 0;
+    timeType = "sport";
+    startBtn.innerText = "开始训练";
+    refreshAction();
+}
+
+function closeScore() {
+    document.getElementById("scorePop").style.display = "none";
+}
+
+window.onload = function() {
+    loadStars();
+    refreshAction();
+}
+</script>
+</body>
+</html>
